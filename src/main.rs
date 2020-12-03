@@ -1,5 +1,5 @@
 fn main() {
-    day2::part2()
+    day3::part2()
 }
 
 mod day1 {
@@ -108,5 +108,41 @@ mod day2 {
                 .filter(|password| password.is_valid_position())
                 .count()
         )
+    }
+}
+mod day3 {
+    fn slide(trees: &[Vec<bool>], delta_x: usize, delta_y: usize) -> usize {
+        let (mut row, mut column) = (0, 0);
+        let mut count = 0;
+        while row < trees.len() {
+            if trees[row][column] {
+                count += 1
+            }
+            row += delta_y;
+            column = (column + delta_x) % trees[0].len();
+        }
+        count
+    }
+    pub fn part1() {
+        let input: Vec<Vec<bool>> = include_str!("../inputs/day3.txt")
+            .lines()
+            .map(|line| line.chars().map(|chr| chr == '#').collect())
+            .collect();
+
+        println!("{}", slide(&input, 3, 1));
+    }
+    pub fn part2() {
+        let input: Vec<Vec<bool>> = include_str!("../inputs/day3.txt")
+            .lines()
+            .map(|line| line.chars().map(|chr| chr == '#').collect())
+            .collect();
+        println!(
+            "{}",
+            slide(&input, 1, 1)
+                * slide(&input, 3, 1)
+                * slide(&input, 5, 1)
+                * slide(&input, 7, 1)
+                * slide(&input, 1, 2)
+        );
     }
 }
