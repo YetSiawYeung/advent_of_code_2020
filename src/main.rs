@@ -1,5 +1,5 @@
 fn main() {
-    day3::part2()
+    day4::part2()
 }
 
 mod day1 {
@@ -143,6 +143,164 @@ mod day3 {
                 * slide(&input, 5, 1)
                 * slide(&input, 7, 1)
                 * slide(&input, 1, 2)
+        );
+    }
+}
+mod day4 {
+    pub fn part1() {
+        let input: Vec<String> = include_str!("../inputs/day4.txt")
+            .split("\r\n\r\n")
+            .map(|string| string.replace("\r\n", " "))
+            .filter(|string| !string.is_empty())
+            .collect();
+        println!(
+            "{}",
+            input
+                .iter()
+                .filter(|string| {
+                    let mut birth_year = false;
+                    let mut issue_year = false;
+                    let mut exp_year = false;
+                    let mut height = false;
+                    let mut hair_colour = false;
+                    let mut eye_colour = false;
+                    let mut passport_id = false;
+                    let mut country_id = false;
+
+                    string
+                        .trim()
+                        .split(' ')
+                        .for_each(|substr| match &substr[..3] {
+                            "byr" => birth_year = true,
+                            "iyr" => issue_year = true,
+                            "eyr" => exp_year = true,
+                            "hgt" => height = true,
+                            "hcl" => hair_colour = true,
+                            "ecl" => eye_colour = true,
+                            "pid" => passport_id = true,
+                            "cid" => country_id = true,
+                            _ => unreachable!(),
+                        });
+                    birth_year
+                        && issue_year
+                        && exp_year
+                        && height
+                        && hair_colour
+                        && eye_colour
+                        && passport_id
+                })
+                .count()
+        );
+    }
+    pub fn part2() {
+        let input: Vec<String> = include_str!("../inputs/day4.txt")
+            .split("\r\n\r\n")
+            .map(|string| string.replace("\r\n", " "))
+            .filter(|string| !string.is_empty())
+            .collect();
+        println!(
+            "{}",
+            input
+                .iter()
+                .filter(|string| {
+                    let mut birth_year = false;
+                    let mut issue_year = false;
+                    let mut exp_year = false;
+                    let mut height = false;
+                    let mut hair_colour = false;
+                    let mut eye_colour = false;
+                    let mut passport_id = false;
+                    let mut country_id = false;
+
+                    string
+                        .trim()
+                        .split(' ')
+                        .for_each(|substr| match &substr[..3] {
+                            "byr" => {
+                                if 1920 <= substr[4..].parse().unwrap()
+                                    && 2002 >= substr[4..].parse().unwrap()
+                                {
+                                    birth_year = true
+                                }
+                            }
+                            "iyr" => {
+                                if 2010 <= substr[4..].parse().unwrap()
+                                    && 2020 >= substr[4..].parse().unwrap()
+                                {
+                                    issue_year = true
+                                }
+                            }
+                            "eyr" => {
+                                if 2020 <= substr[4..].parse().unwrap()
+                                    && 2030 >= substr[4..].parse().unwrap()
+                                {
+                                    exp_year = true
+                                }
+                            }
+                            "hgt" => {
+                                let mut height_value = 0;
+                                let mut ptr = 4;
+
+                                while ptr < substr.len() {
+                                    match substr.as_bytes()[ptr] {
+                                        b'0'..=b'9' => {
+                                            height_value *= 10;
+                                            height_value += substr.as_bytes()[ptr] - b'0'
+                                        }
+                                        _ => break,
+                                    }
+                                    ptr += 1
+                                }
+                                let units = &substr[ptr..];
+                                match units {
+                                    "cm" => {
+                                        if (150..=193).contains(&height_value) {
+                                            height = true
+                                        }
+                                    }
+                                    "in" => {
+                                        if (59..=76).contains(&height_value) {
+                                            height = true
+                                        }
+                                    }
+                                    _ => {} //invalid units
+                                }
+                            }
+                            "hcl" => {
+                                if substr.as_bytes()[4] == b'#'
+                                    && substr.len() == 11
+                                    && substr[5..]
+                                        .as_bytes()
+                                        .iter()
+                                        .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+                                {
+                                    hair_colour = true
+                                };
+                            }
+                            "ecl" => match &substr[4..] {
+                                "amb" | "blu" | "brn" | "gry" | "grn" | "hzl" | "oth" => {
+                                    eye_colour = true
+                                }
+                                _ => {}
+                            },
+                            "pid" => {
+                                if substr[4..].len() == 9 {
+                                    passport_id = true
+                                }
+                            }
+                            "cid" => country_id = true,
+                            _ => unreachable!(),
+                        });
+
+                    birth_year
+                        && issue_year
+                        && exp_year
+                        && height
+                        && hair_colour
+                        && eye_colour
+                        && passport_id
+                })
+                .count()
         );
     }
 }
