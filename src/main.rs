@@ -1,5 +1,5 @@
 fn main() {
-    day4::part2()
+    day5::part2()
 }
 
 mod day1 {
@@ -302,5 +302,49 @@ mod day4 {
                 })
                 .count()
         );
+    }
+}
+mod day5 {
+    fn find(seat: &str) -> u32 {
+        let mut lo = 0;
+        let mut hi = 127;
+        for partition in &seat.as_bytes()[..7] {
+            match partition {
+                b'F' => hi = (hi + lo) / 2,
+                b'B' => lo = (hi + lo + 1) / 2,
+                _ => panic!(),
+            }
+        }
+        assert!(lo == hi);
+        let mut left = 0;
+        let mut right = 7;
+        for side in &seat.as_bytes()[7..] {
+            match side {
+                b'L' => right = (right + left) / 2,
+                b'R' => left = (right + left + 1) / 2,
+                _ => panic!(),
+            }
+        }
+        assert!(left == right);
+        let row = lo;
+        let column = left;
+        row * 8 + column
+    }
+    pub fn part1() {
+        let input = include_str!("../inputs/day5.txt");
+        println!("{}", input.lines().map(|line| find(line)).max().unwrap());
+    }
+    pub fn part2() {
+        let input = include_str!("../inputs/day5.txt");
+        let mut seats = input.lines().map(|line| find(line)).collect::<Vec<_>>();
+        seats.sort_unstable();
+        let base = seats[0];
+        for (i, &seat) in seats.iter().enumerate() {
+            if seat != base + i as u32 {
+                println!("{}", base + i as u32);
+                return;
+            }
+        }
+        panic!("seat not found")
     }
 }
