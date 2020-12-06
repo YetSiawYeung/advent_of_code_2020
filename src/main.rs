@@ -1,5 +1,5 @@
 fn main() {
-    day5::part2()
+    day6::part2()
 }
 
 mod day1 {
@@ -346,5 +346,54 @@ mod day5 {
             }
         }
         panic!("seat not found")
+    }
+}
+mod day6 {
+    use std::collections::{HashMap, HashSet};
+    pub fn part1() {
+        let input: Vec<String> = include_str!("../inputs/day6.txt")
+            .split("\r\n\r\n")
+            .map(|string| string.to_string())
+            .filter(|string| !string.is_empty())
+            .collect();
+        println!(
+            "{:?}",
+            input
+                .iter()
+                .map(|group| {
+                    let mut seen = HashSet::new();
+                    for chr in group.chars() {
+                        if !chr.is_whitespace() {
+                            seen.insert(chr);
+                        }
+                    }
+                    seen.len()
+                })
+                .sum::<usize>()
+        );
+    }
+    pub fn part2() {
+        let input: Vec<String> = include_str!("../inputs/day6.txt")
+            .split("\r\n\r\n")
+            .map(|string| string.to_string())
+            .filter(|string| !string.is_empty())
+            .collect();
+        println!(
+            "{:?}",
+            input
+                .iter()
+                .map(|group| {
+                    let mut seen = HashMap::new();
+                    for chr in group.chars() {
+                        if !chr.is_whitespace() {
+                            *seen.entry(chr).or_insert(0) += 1;
+                        }
+                    }
+                    seen.iter()
+                        .filter(|(_key, value)| **value == group.lines().count())
+                        .count()
+                })
+                .sum::<usize>()
+        );
     }
 }
