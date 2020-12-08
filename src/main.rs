@@ -1,5 +1,5 @@
 fn main() {
-    day6::part2()
+    day8::part2()
 }
 
 mod day1 {
@@ -395,5 +395,232 @@ mod day6 {
                 })
                 .sum::<usize>()
         );
+    }
+}
+mod day7 {
+    use std::collections::{HashMap, HashSet};
+
+    fn contains_shiny_gold_bag(
+        bag: &str,
+        capacities: &HashMap<String, Vec<(u32, String)>>,
+        memo: &mut HashMap<String, bool>,
+    ) -> bool {
+        if memo.contains_key(bag) {
+            return memo[bag];
+        }
+        let can_contain = capacities[bag].iter().any(|(_limit, bag)| {
+            if bag == "shiny gold" {
+                true
+            } else {
+                contains_shiny_gold_bag(bag, capacities, memo)
+            }
+        });
+        memo.insert(bag.to_string(), can_contain);
+        memo[bag]
+    }
+    pub fn part1() {
+        let input: Vec<&str> = include_str!("../inputs/day7.txt").lines().collect();
+        let mut bag_type = HashSet::with_capacity(input.len());
+        let mut bag_capacities = HashMap::new();
+
+        for string in input {
+            let mut string = string.split(" contain ");
+            let left = string.next().unwrap().replacen(" bags", "", 1);
+            let right = string.next().unwrap().trim_end_matches('.').split(", ");
+
+            if !bag_type.contains(&left) {
+                bag_type.insert(left.clone());
+            }
+            let mut holding_capacity = Vec::new();
+            for can_hold in right {
+                if can_hold == "no other bags" {
+                    break;
+                }
+                let mut can_hold = can_hold.split(' ');
+                let count: u32 = can_hold.next().unwrap().parse().unwrap();
+
+                let mut name = String::new();
+                name += can_hold.next().unwrap();
+                name += " ";
+                name += can_hold.next().unwrap();
+
+                if !bag_type.contains(&name) {
+                    bag_type.insert(name.clone());
+                }
+                holding_capacity.push((count, name));
+            }
+            bag_capacities.insert(left, holding_capacity);
+        }
+
+        let mut can_contain_shiny_gold = HashMap::new();
+        for bag in &bag_type {
+            contains_shiny_gold_bag(bag, &bag_capacities, &mut can_contain_shiny_gold);
+        }
+
+        println!(
+            "{}",
+            can_contain_shiny_gold
+                .iter()
+                .filter(|(_key, value)| **value)
+                .count()
+        );
+    }
+    fn bag_count(
+        bag: &str,
+        capacities: &HashMap<String, Vec<(usize, String)>>,
+        memo: &mut HashMap<String, usize>,
+    ) -> usize {
+        if memo.contains_key(bag) {
+            return memo[bag];
+        }
+
+        let count = capacities[bag]
+            .iter()
+            .map(|(limit, bag)| {
+                if bag == "shiny gold" {
+                    panic!("cycle found")
+                } else {
+                    limit * bag_count(bag, capacities, memo) + limit
+                }
+            })
+            .sum();
+        memo.insert(bag.to_string(), count);
+        memo[bag]
+    }
+    pub fn part2() {
+        let input: Vec<&str> = include_str!("../inputs/day7.txt").lines().collect();
+        let mut bag_type = HashMap::with_capacity(input.len());
+        let mut bag_capacities = HashMap::new();
+
+        for string in input {
+            let mut string = string.split(" contain ");
+            let left = string.next().unwrap().replacen(" bags", "", 1);
+            let right = string.next().unwrap().trim_end_matches('.').split(", ");
+
+            if !bag_type.contains_key(&left) {
+                bag_type.insert(left.clone(), bag_type.len());
+            }
+            let mut holding_capacity = Vec::new();
+            for can_hold in right {
+                if can_hold == "no other bags" {
+                    break;
+                }
+                let mut can_hold = can_hold.split(' ');
+                let count: usize = can_hold.next().unwrap().parse().unwrap();
+
+                let mut name = String::new();
+                name += can_hold.next().unwrap();
+                name += " ";
+                name += can_hold.next().unwrap();
+
+                if !bag_type.contains_key(&name) {
+                    bag_type.insert(name.clone(), bag_type.len());
+                }
+                holding_capacity.push((count, name));
+            }
+            bag_capacities.insert(left, holding_capacity);
+        }
+
+        let mut can_contain_shiny_gold = HashMap::new();
+
+        println!(
+            "{}",
+            bag_count("shiny gold", &bag_capacities, &mut can_contain_shiny_gold)
+        );
+    }
+}
+mod day8 {
+    use std::vec;
+    struct Machine {
+        instructions: Vec<Ops>,
+        acc: i32,
+        current: usize,
+    }
+    impl Machine {
+        fn run_until_looped(&mut self) -> TerminateReason {
+            let mut visited = vec![false; self.instructions.len()];
+            loop {
+                if self.current >= self.instructions.len() {
+                    return TerminateReason::EndOfProgram;
+                }
+                if visited[self.current] {
+                    return TerminateReason::InfiniteLoop;
+                }
+
+                visited[self.current] = true;
+
+                match self.instructions[self.current] {
+                    Ops::Jmp(arg) => self.current = (self.current as i32 + arg) as usize,
+                    Ops::Acc(arg) => {
+                        self.acc += arg;
+                        self.current += 1
+                    }
+                    Ops::Nop(_) => self.current += 1,
+                }
+            }
+        }
+    }
+    #[derive(Debug, Clone)]
+    enum Ops {
+        Nop(i32),
+        Acc(i32),
+        Jmp(i32),
+    }
+    impl std::str::FromStr for Ops {
+        type Err = &'static str;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut s = s.split(' ');
+            match s.next().unwrap() {
+                "nop" => Ok(Ops::Nop(s.next().unwrap().parse().unwrap())),
+                "acc" => Ok(Ops::Acc(s.next().unwrap().parse().unwrap())),
+                "jmp" => Ok(Ops::Jmp(s.next().unwrap().parse().unwrap())),
+                _ => Err("unknown instruction"),
+            }
+        }
+    }
+    pub fn part1() {
+        let input: Vec<Ops> = include_str!("../inputs/day8.txt")
+            .lines()
+            .map(|ops| ops.parse().unwrap())
+            .collect();
+        let mut machine = Machine {
+            instructions: input,
+            acc: 0,
+            current: 0,
+        };
+        machine.run_until_looped();
+        println!("{}", machine.acc);
+    }
+    enum TerminateReason {
+        InfiniteLoop,
+        EndOfProgram,
+    }
+    pub fn part2() {
+        let input: Vec<Ops> = include_str!("../inputs/day8.txt")
+            .lines()
+            .map(|ops| ops.parse().unwrap())
+            .collect();
+        for i in 0..input.len() {
+            let mut input = input.clone();
+            match input[i] {
+                Ops::Nop(arg) => input[i] = Ops::Jmp(arg),
+                Ops::Jmp(arg) => input[i] = Ops::Nop(arg),
+                Ops::Acc(_) => {
+                    continue;
+                }
+            }
+            let mut machine = Machine {
+                instructions: input,
+                acc: 0,
+                current: 0,
+            };
+            match machine.run_until_looped() {
+                TerminateReason::EndOfProgram => {
+                    println!("{}", machine.acc);
+                    return;
+                }
+                TerminateReason::InfiniteLoop => {}
+            }
+        }
     }
 }
