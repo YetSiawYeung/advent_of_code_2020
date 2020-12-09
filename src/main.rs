@@ -1,5 +1,5 @@
 fn main() {
-    day8::part2()
+    day9::part2();
 }
 
 mod day1 {
@@ -620,6 +620,88 @@ mod day8 {
                     return;
                 }
                 TerminateReason::InfiniteLoop => {}
+            }
+        }
+    }
+}
+mod day9 {
+    use std::{cmp::Ordering, collections::VecDeque};
+
+    pub fn part1() {
+        const PREAMBLE: usize = 25;
+        let input: Vec<u64> = include_str!("../inputs/day9.txt")
+            .lines()
+            .map(|ops| ops.parse().unwrap())
+            .collect();
+
+        let mut queue = {
+            let mut queue = VecDeque::with_capacity(PREAMBLE);
+            for &i in input.iter().take(PREAMBLE) {
+                queue.push_back(i);
+            }
+            queue
+        };
+
+        for &num in &input[PREAMBLE..input.len()] {
+            let valid = queue.iter().any(|first| {
+                queue
+                    .iter()
+                    .any(|second| first != second && first + second == num)
+            });
+            if valid {
+                queue.pop_front();
+                queue.push_back(num);
+            } else {
+                println!("{}", num);
+                return;
+            }
+        }
+    }
+    pub fn part2() {
+        const PREAMBLE: usize = 25;
+        let input: Vec<u64> = include_str!("../inputs/day9.txt")
+            .lines()
+            .map(|ops| ops.parse().unwrap())
+            .collect();
+
+        let mut queue = {
+            let mut queue = VecDeque::with_capacity(PREAMBLE);
+            for &i in input.iter().take(PREAMBLE) {
+                queue.push_back(i);
+            }
+            queue
+        };
+        let mut i = PREAMBLE;
+        while i < input.len() {
+            let num = input[i];
+            let valid = queue.iter().any(|first| {
+                queue
+                    .iter()
+                    .any(|second| first != second && first + second == num)
+            });
+            if valid {
+                queue.pop_front();
+                queue.push_back(num);
+            } else {
+                break;
+            }
+            i += 1;
+        }
+
+        for start in 0..i {
+            for end in start..i {
+                match input[start..end].iter().sum::<u64>().cmp(&input[i]) {
+                    Ordering::Equal => {
+                        println!(
+                            "{}",
+                            input[start..end].iter().max().unwrap()
+                                + input[start..end].iter().min().unwrap()
+                        );
+                        return;
+                    }
+                    Ordering::Greater => break,
+                    Ordering::Less => {}
+                }
             }
         }
     }
