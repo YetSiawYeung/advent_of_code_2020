@@ -1,5 +1,5 @@
 fn main() {
-    day9::part2();
+    day12::part2();
 }
 
 mod day1 {
@@ -704,5 +704,364 @@ mod day9 {
                 }
             }
         }
+    }
+}
+mod day10 {
+    pub fn part1() {
+        let mut input: Vec<u32> = include_str!("../inputs/day10.txt")
+            .lines()
+            .map(|num| num.parse().unwrap())
+            .collect();
+        input.push(0);
+        input.push(input.iter().max().unwrap() + 3);
+        input.sort_unstable();
+        let (ones, threes) = input.windows(2).fold((0, 0), |(ones, threes), window| {
+            match window[1] - window[0] {
+                1 => (ones + 1, threes),
+                3 => (ones, threes + 1),
+                _ => (ones, threes),
+            }
+        });
+        println!("{}", ones * threes);
+    }
+    pub fn part2() {
+        let mut input: Vec<u32> = include_str!("../inputs/day10.txt")
+            .lines()
+            .map(|num| num.parse().unwrap())
+            .collect();
+        input.push(0);
+        input.push(input.iter().max().unwrap() + 3);
+        input.sort_unstable();
+
+        let mut ways: Vec<u64> = vec![0; input.len()];
+        ways[0] = 1;
+
+        for i in 0..input.len() {
+            for j in i + 1..input.len() {
+                if input[j] - input[i] <= 3 {
+                    ways[j] += ways[i];
+                } else {
+                    break;
+                }
+            }
+        }
+
+        println!("{}", ways.last().unwrap())
+    }
+}
+mod day11 {
+    #[derive(Debug, Clone)]
+    enum Seat {
+        Floor,
+        Empty,
+        Occupied,
+    }
+    impl Seat {
+        fn from_bytes(byte: u8) -> Self {
+            match byte {
+                b'.' => Seat::Floor,
+                b'L' => Seat::Empty,
+                b'#' => Seat::Occupied,
+                _ => panic!(),
+            }
+        }
+    }
+    pub fn part1() {
+        let mut layout: Vec<Vec<Seat>> = include_str!("../inputs/day11.txt")
+            .lines()
+            .map(|row| row.bytes().map(Seat::from_bytes).collect())
+            .collect();
+        let mut changed = true;
+        while changed {
+            let mut new_layout = layout.clone();
+            changed = false;
+            for row in 0..new_layout.len() {
+                for col in 0..new_layout[0].len() {
+                    let prev_row_valid = row > 0;
+                    let prev_col_valid = col > 0;
+                    let next_row_valid = row + 1 < layout.len();
+                    let next_col_valid = col + 1 < layout[0].len();
+                    let occupied_neighbours = [
+                        (prev_row_valid
+                            && prev_col_valid
+                            && matches!(layout[row - 1][col - 1], Seat::Occupied)),
+                        (prev_row_valid && matches!(layout[row - 1][col], Seat::Occupied)),
+                        (prev_row_valid
+                            && next_col_valid
+                            && matches!(layout[row - 1][col + 1], Seat::Occupied)),
+                        (prev_col_valid && matches!(layout[row][col - 1], Seat::Occupied)),
+                        (next_col_valid && matches!(layout[row][col + 1], Seat::Occupied)),
+                        (next_row_valid
+                            && prev_col_valid
+                            && matches!(layout[row + 1][col - 1], Seat::Occupied)),
+                        (next_row_valid && matches!(layout[row + 1][col], Seat::Occupied)),
+                        (next_row_valid
+                            && next_col_valid
+                            && matches!(layout[row + 1][col + 1], Seat::Occupied)),
+                    ]
+                    .iter()
+                    .filter(|neighbour| **neighbour)
+                    .count();
+                    match layout[row][col] {
+                        Seat::Empty => {
+                            if occupied_neighbours == 0 {
+                                new_layout[row][col] = Seat::Occupied;
+                                changed = true;
+                            }
+                        }
+                        Seat::Occupied => {
+                            if occupied_neighbours >= 4 {
+                                new_layout[row][col] = Seat::Empty;
+                                changed = true;
+                            }
+                        }
+                        Seat::Floor => {}
+                    }
+                }
+            }
+            layout = new_layout;
+        }
+        println!(
+            "{}",
+            layout
+                .iter()
+                .map(|row| row
+                    .iter()
+                    .filter(|seat| matches!(seat, Seat::Occupied))
+                    .count())
+                .sum::<usize>()
+        );
+    }
+    pub fn part2() {
+        let mut layout: Vec<Vec<Seat>> = include_str!("../inputs/day11.txt")
+            .lines()
+            .map(|row| row.bytes().map(Seat::from_bytes).collect())
+            .collect();
+        let mut changed = true;
+        while changed {
+            let mut new_layout = layout.clone();
+            changed = false;
+            for row in 0..new_layout.len() {
+                for col in 0..new_layout[0].len() {
+                    let find_occupied = |(row, col): (usize, usize)| match layout[row][col] {
+                        Seat::Empty => Some(false),
+                        Seat::Occupied => Some(true),
+                        Seat::Floor => None,
+                    };
+                    let top_left = (0..row).rev().zip((0..col).rev()).find_map(find_occupied);
+                    let top = (0..row).rev().map(|row| (row, col)).find_map(find_occupied);
+                    let top_right = (0..row)
+                        .rev()
+                        .zip(col + 1..layout[0].len())
+                        .find_map(find_occupied);
+                    let left = (0..col).rev().map(|col| (row, col)).find_map(find_occupied);
+                    let right = (col + 1..layout[0].len())
+                        .map(|col| (row, col))
+                        .find_map(find_occupied);
+                    let bot_left = (row + 1..layout.len())
+                        .zip((0..col).rev())
+                        .find_map(find_occupied);
+                    let bot = (row + 1..layout.len())
+                        .map(|row| (row, col))
+                        .find_map(find_occupied);
+                    let bot_right = (row + 1..layout.len())
+                        .zip(col + 1..layout[0].len())
+                        .find_map(find_occupied);
+                    let occupied_neighbours = [
+                        top_left, top, top_right, left, right, bot_left, bot, bot_right,
+                    ]
+                    .iter()
+                    .filter(|neighbour| **neighbour == Some(true))
+                    .count();
+
+                    match layout[row][col] {
+                        Seat::Empty => {
+                            if occupied_neighbours == 0 {
+                                new_layout[row][col] = Seat::Occupied;
+                                changed = true;
+                            }
+                        }
+                        Seat::Occupied => {
+                            if occupied_neighbours >= 5 {
+                                new_layout[row][col] = Seat::Empty;
+                                changed = true;
+                            }
+                        }
+                        Seat::Floor => {}
+                    }
+                }
+            }
+            layout = new_layout;
+            // dbg!(&layout);
+        }
+        println!(
+            "{}",
+            layout
+                .iter()
+                .map(|row| row
+                    .iter()
+                    .filter(|seat| matches!(seat, Seat::Occupied))
+                    .count())
+                .sum::<usize>()
+        );
+    }
+}
+mod day12 {
+    #[derive(Debug)]
+    enum Instructions {
+        North(u32),
+        South(u32),
+        East(u32),
+        West(u32),
+        Left(u32),
+        Right(u32),
+        Forward(u32),
+    }
+    impl std::str::FromStr for Instructions {
+        type Err = &'static str;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let magnitude = s[1..].parse().unwrap();
+            Ok(match &s[..1] {
+                "N" => Instructions::North(magnitude),
+                "S" => Instructions::South(magnitude),
+                "E" => Instructions::East(magnitude),
+                "W" => Instructions::West(magnitude),
+                "L" => Instructions::Left(magnitude),
+                "R" => Instructions::Right(magnitude),
+                "F" => Instructions::Forward(magnitude),
+                _ => return Err("idk"),
+            })
+        }
+    }
+    #[derive(Debug)]
+    enum Direction {
+        North,
+        South,
+        East,
+        West,
+    }
+    impl Direction {
+        fn right(&mut self) {
+            *self = match self {
+                Direction::North => Direction::East,
+                Direction::East => Direction::South,
+                Direction::South => Direction::West,
+                Direction::West => Direction::North,
+            }
+        }
+        fn left(&mut self) {
+            *self = match self {
+                Direction::North => Direction::West,
+                Direction::West => Direction::South,
+                Direction::South => Direction::East,
+                Direction::East => Direction::North,
+            }
+        }
+    }
+    #[derive(Debug)]
+    struct Ship {
+        x: i32,
+        y: i32,
+        dir: Direction,
+    }
+    pub fn part1() {
+        let input: Vec<Instructions> = include_str!("../inputs/day12.txt")
+            .lines()
+            .map(|ins| ins.parse().unwrap())
+            .collect();
+        let ship = input.iter().fold(
+            Ship {
+                x: 0,
+                y: 0,
+                dir: Direction::East,
+            },
+            |mut ship, ins| {
+                match ins {
+                    Instructions::North(dist) => ship.y += *dist as i32,
+                    Instructions::South(dist) => ship.y -= *dist as i32,
+                    Instructions::East(dist) => ship.x += *dist as i32,
+                    Instructions::West(dist) => ship.x -= *dist as i32,
+                    Instructions::Left(angle) => {
+                        for _ in 0..angle / 90 {
+                            ship.dir.left()
+                        }
+                    }
+                    Instructions::Right(angle) => {
+                        for _ in 0..angle / 90 {
+                            ship.dir.right()
+                        }
+                    }
+                    Instructions::Forward(dist) => match ship.dir {
+                        Direction::North => ship.y += *dist as i32,
+                        Direction::South => ship.y -= *dist as i32,
+                        Direction::East => ship.x += *dist as i32,
+                        Direction::West => ship.x -= *dist as i32,
+                    },
+                };
+                ship
+            },
+        );
+
+        println!("{}", ship.x.abs() + ship.y.abs());
+    }
+    struct Waypoint {
+        x: i32,
+        y: i32,
+    }
+    impl Waypoint {
+        fn left(&mut self) {
+            let temp = self.x;
+            self.x = -self.y;
+            self.y = temp;
+        }
+        fn right(&mut self) {
+            for _ in 0..3 {
+                self.left()
+            }
+        }
+    }
+    pub fn part2() {
+        let input: Vec<Instructions> = include_str!("../inputs/day12.txt")
+            .lines()
+            .map(|ins| ins.parse().unwrap())
+            .collect();
+
+        let (ship, _waypoint) = input.iter().fold(
+            (
+                Ship {
+                    x: 0,
+                    y: 0,
+                    dir: Direction::East,
+                },
+                Waypoint { x: 10, y: 1 },
+            ),
+            |(mut ship, mut waypoint), ins| {
+                match ins {
+                    Instructions::North(dist) => waypoint.y += *dist as i32,
+                    Instructions::South(dist) => waypoint.y -= *dist as i32,
+                    Instructions::East(dist) => waypoint.x += *dist as i32,
+                    Instructions::West(dist) => waypoint.x -= *dist as i32,
+                    Instructions::Left(angle) => {
+                        for _ in 0..angle / 90 {
+                            waypoint.left()
+                        }
+                    }
+                    Instructions::Right(angle) => {
+                        for _ in 0..angle / 90 {
+                            waypoint.right()
+                        }
+                    }
+                    Instructions::Forward(times) => {
+                        let times = *times as i32;
+                        ship.x += times * waypoint.x;
+                        ship.y += times * waypoint.y
+                    }
+                };
+                (ship, waypoint)
+            },
+        );
+
+        println!("{}", ship.x.abs() + ship.y.abs());
     }
 }
