@@ -1,5 +1,5 @@
 fn main() {
-    day12::part2();
+    day14::part2();
 }
 
 mod day1 {
@@ -1063,5 +1063,213 @@ mod day12 {
         );
 
         println!("{}", ship.x.abs() + ship.y.abs());
+    }
+}
+mod day13 {
+    pub fn part1() {
+        let mut input = include_str!("../inputs/day13.txt").lines();
+        let current_time: u32 = input.next().unwrap().parse().unwrap();
+        let busses: Vec<u32> = input
+            .next()
+            .unwrap()
+            .split(',')
+            .filter_map(|id| id.parse().ok())
+            .collect();
+
+        let (id, time) = busses
+            .iter()
+            .map(|&id| (id, id * (1 + current_time / id)))
+            .min_by_key(|(_id, time)| *time)
+            .unwrap();
+        println!("{}", id * (time - current_time));
+    }
+    pub fn part2() {
+        let mut input = include_str!("../inputs/day13.txt").lines();
+        let _current_time: u64 = input.next().unwrap().parse().unwrap();
+        let busses: Vec<(u64, u64)> = input
+            .next()
+            .unwrap()
+            .split(',')
+            .enumerate()
+            .filter_map(|(count, id)| {
+                if let Ok(id) = id.parse() {
+                    Some((count as u64, id))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // assumes first bus is not "x"
+        let mut i = 0;
+        let mut mult = 1;
+        let mut time = mult;
+        while i < busses.len() {
+            while (time + busses[i].0) % busses[i].1 != 0 {
+                time += mult
+            }
+            mult *= busses[i].1; // should be LCM, but all given numbers are prime
+            i += 1;
+        }
+        println!("{}", time);
+    }
+}
+mod day14 {
+    use std::collections::HashMap;
+    #[derive(Debug)]
+    enum Mask {
+        Override(bool),
+        Unchanged,
+    }
+    impl Mask {
+        fn from_char(s: char) -> Self {
+            match s {
+                '1' => Mask::Override(true),
+                '0' => Mask::Override(false),
+                'X' => Mask::Unchanged,
+                _ => panic!("unknown mask"),
+            }
+        }
+    }
+    #[derive(Debug)]
+    struct Write {
+        address: u64,
+        value: u64,
+    }
+    impl Write {
+        fn mask_values(address: u64, mut value: u64, bitmask: &[Mask]) -> Self {
+            for (i, mask) in bitmask.iter().rev().enumerate() {
+                match mask {
+                    Mask::Override(true) => {
+                        // set bit at i to 1
+                        let mask = 1 << i;
+                        value |= mask;
+                    }
+                    Mask::Override(false) => {
+                        // set bit at i to 0
+                        let mask = u64::MAX ^ (1 << i);
+                        value &= mask;
+                    }
+                    Mask::Unchanged => {}
+                }
+            }
+            Self { address, value }
+        }
+        fn mask_address(address: u64, value: u64, bitmask: &[Mask2]) -> Vec<Self> {
+            let mut addresses = vec![0];
+            let mut i = 0;
+            while i < bitmask.len() {
+                match bitmask[i] {
+                    Mask2::Override => addresses.iter_mut().for_each(|addr| {
+                        *addr <<= 1;
+                        *addr += 1
+                    }),
+                    Mask2::Unchanged => addresses.iter_mut().for_each(|addr| {
+                        *addr <<= 1;
+                        *addr |= (address >> (bitmask.len() - 1 - i)) & 1;
+                    }),
+                    Mask2::Floating => {
+                        for addr in &mut addresses {
+                            *addr <<= 1;
+                        }
+                        for i in 0..addresses.len() {
+                            addresses.push(addresses[i] + 1);
+                        }
+                    }
+                }
+                i += 1;
+            }
+
+            addresses
+                .into_iter()
+                .map(|address| Write { address, value })
+                .collect()
+        }
+    }
+    pub fn part1() {
+        let writes: Vec<Write> = include_str!("../inputs/day14.txt")
+            .split("mask = ")
+            .filter(|line| !line.is_empty())
+            .fold(Vec::new(), |mut acc, group| {
+                let mut lines = group.lines();
+                let bitmask: Vec<Mask> =
+                    lines.next().unwrap().chars().map(Mask::from_char).collect();
+
+                acc.extend(lines.map(|line| {
+                    let mut write = line.split(" = ");
+                    let address: u64 = write
+                        .next()
+                        .unwrap()
+                        .strip_prefix("mem[")
+                        .unwrap()
+                        .strip_suffix(']')
+                        .unwrap()
+                        .parse()
+                        .unwrap();
+                    let value: u64 = write.next().unwrap().parse().unwrap();
+                    Write::mask_values(address, value, &bitmask)
+                }));
+                acc
+            });
+
+        let mut memory: HashMap<u64, u64> = HashMap::new();
+        for write in writes {
+            memory.insert(write.address, write.value);
+        }
+
+        println!("{}", memory.values().sum::<u64>());
+    }
+    #[derive(Debug)]
+    enum Mask2 {
+        Override,
+        Unchanged,
+        Floating,
+    }
+    impl Mask2 {
+        fn from_char(s: char) -> Self {
+            match s {
+                '1' => Mask2::Override,
+                '0' => Mask2::Unchanged,
+                'X' => Mask2::Floating,
+                _ => panic!("unknown mask"),
+            }
+        }
+    }
+    pub fn part2() {
+        let writes: Vec<Write> = include_str!("../inputs/day14.txt")
+            .split("mask = ")
+            .filter(|line| !line.is_empty())
+            .fold(Vec::new(), |mut acc, group| {
+                let mut lines = group.lines();
+                let bitmask: Vec<Mask2> = lines
+                    .next()
+                    .unwrap()
+                    .chars()
+                    .map(Mask2::from_char)
+                    .collect();
+
+                acc.extend(lines.flat_map(|line| {
+                    let mut write = line.split(" = ");
+                    let address: u64 = write
+                        .next()
+                        .unwrap()
+                        .strip_prefix("mem[")
+                        .unwrap()
+                        .strip_suffix(']')
+                        .unwrap()
+                        .parse()
+                        .unwrap();
+                    let value: u64 = write.next().unwrap().parse().unwrap();
+                    Write::mask_address(address, value, &bitmask)
+                }));
+                acc
+            });
+
+        let mut memory: HashMap<u64, u64> = HashMap::new();
+        for write in &writes {
+            memory.insert(write.address, write.value);
+        }
+
+        println!("{}", memory.values().sum::<u64>());
     }
 }
