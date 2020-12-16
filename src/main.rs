@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 fn main() {
-    day14::part2();
+    day16::part2();
 }
 
 mod day1 {
@@ -1271,5 +1273,197 @@ mod day14 {
         }
 
         println!("{}", memory.values().sum::<u64>());
+    }
+}
+mod day15 {
+    use std::collections::HashMap;
+    pub fn part1() {
+        let input: Vec<usize> = include_str!("../inputs/day15.txt")
+            .trim()
+            .split(',')
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let mut last_seen = HashMap::new();
+        let mut i = 1;
+        let mut prev = *input.first().unwrap();
+        while i < input.len() {
+            last_seen.insert(prev, i + 1);
+            prev = input[i];
+            i += 1;
+        }
+        while i < 2020 {
+            let next = if last_seen.contains_key(&prev) {
+                i + 1 - last_seen[&prev]
+            } else {
+                0
+            };
+
+            last_seen.insert(prev, i + 1);
+            i += 1;
+            prev = next;
+        }
+        println!("{}", prev);
+    }
+    pub fn part2() {
+        let input: Vec<usize> = include_str!("../inputs/day15.txt")
+            .trim()
+            .split(',')
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let mut last_seen = HashMap::new();
+        let mut i = 1;
+        let mut prev = *input.first().unwrap();
+        while i < input.len() {
+            last_seen.insert(prev, i + 1);
+            prev = input[i];
+            i += 1;
+        }
+        while i < 30_000_000 {
+            let next = if last_seen.contains_key(&prev) {
+                i + 1 - last_seen[&prev]
+            } else {
+                0
+            };
+
+            last_seen.insert(prev, i + 1);
+            i += 1;
+            prev = next;
+        }
+        println!("{}", prev);
+    }
+}
+mod day16 {
+    use std::ops::RangeInclusive;
+    pub fn part1() {
+        let mut input = include_str!("../inputs/day16.txt").split("\r\n\r\n");
+        let valid: Vec<Vec<RangeInclusive<u32>>> = input
+            .next()
+            .unwrap()
+            .lines()
+            .map(|line| {
+                let ranges = line.split(": ").nth(1).unwrap();
+                ranges
+                    .split(" or ")
+                    .map(|range| {
+                        let mut range = range.split('-');
+                        let lower = range.next().unwrap().parse().unwrap();
+                        let upper = range.next().unwrap().parse().unwrap();
+                        lower..=upper
+                    })
+                    .collect()
+            })
+            .collect();
+        let _my_ticket: Vec<u32> = input
+            .next()
+            .unwrap()
+            .lines()
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let nearby_tickets: Vec<Vec<u32>> = input
+            .next()
+            .unwrap()
+            .lines()
+            .skip(1)
+            .map(|ticket| ticket.split(',').map(|n| n.parse().unwrap()).collect())
+            .collect();
+        let error_rate = nearby_tickets
+            .iter()
+            .flatten()
+            .map(|ticket| {
+                if valid
+                    .iter()
+                    .any(|ranges| ranges.iter().any(|range| range.contains(ticket)))
+                {
+                    0
+                } else {
+                    *ticket
+                }
+            })
+            .sum::<u32>();
+        println!("{}", error_rate);
+    }
+    pub fn part2() {
+        let mut input = include_str!("../inputs/day16.txt").split("\r\n\r\n");
+        let valid: Vec<Vec<RangeInclusive<u64>>> = input
+            .next()
+            .unwrap()
+            .lines()
+            .map(|line| {
+                let ranges = line.split(": ").nth(1).unwrap();
+                ranges
+                    .split(" or ")
+                    .map(|range| {
+                        let mut range = range.split('-');
+                        let lower = range.next().unwrap().parse().unwrap();
+                        let upper = range.next().unwrap().parse().unwrap();
+                        lower..=upper
+                    })
+                    .collect()
+            })
+            .collect();
+        let my_ticket: Vec<u64> = input
+            .next()
+            .unwrap()
+            .lines()
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let mut nearby_tickets: Vec<Vec<u64>> = input
+            .next()
+            .unwrap()
+            .lines()
+            .skip(1)
+            .map(|ticket| ticket.split(',').map(|n| n.parse().unwrap()).collect())
+            .collect();
+        let valid_field = |field: &u64, ranges: &[Vec<RangeInclusive<u64>>]| {
+            ranges
+                .iter()
+                .any(|subrange| subrange.iter().any(|f| f.contains(field)))
+        };
+        nearby_tickets.retain(|ticket| ticket.iter().all(|field| valid_field(field, &valid)));
+
+        let mut possibilities = vec![Vec::new(); nearby_tickets[0].len()];
+        for i in 0..nearby_tickets[0].len() {
+            for (field_no, field) in valid.iter().enumerate() {
+                if nearby_tickets
+                    .iter()
+                    .map(|ticket| ticket[i])
+                    .all(|ticket| field.iter().any(|f| f.contains(&ticket)))
+                {
+                    possibilities[i].push(field_no);
+                }
+            }
+        }
+
+        let mut finalized = vec![None; nearby_tickets[0].len()];
+        while finalized.iter().any(Option::is_none) {
+            let (idx, field) = possibilities
+                .iter()
+                .enumerate()
+                .find(|(_i, options)| options.len() == 1)
+                .unwrap();
+            let f = field[0];
+            finalized[idx] = Some(f);
+            for options in &mut possibilities {
+                *options = options
+                    .iter_mut()
+                    .filter_map(|num| if *num == f { None } else { Some(*num) })
+                    .collect()
+            }
+        }
+
+        println!(
+            "{}",
+            my_ticket
+                .iter()
+                .zip(finalized.iter())
+                .filter_map(|(tix, field)| if field.unwrap() < 6 { Some(*tix) } else { None })
+                .product::<u64>()
+        );
     }
 }
