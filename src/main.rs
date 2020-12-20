@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 fn main() {
-    day16::part2();
+    day18::part2();
 }
 
 mod day1 {
@@ -1465,5 +1465,416 @@ mod day16 {
                 .filter_map(|(tix, field)| if field.unwrap() < 6 { Some(*tix) } else { None })
                 .product::<u64>()
         );
+    }
+}
+mod day17 {
+    use std::collections::{HashMap, HashSet};
+
+    #[derive(Debug, Clone)]
+    enum State {
+        Active,
+        Inactive,
+    }
+    impl State {
+        fn from_bytes(byte: u8) -> Self {
+            match byte {
+                b'#' => State::Active,
+                _ => State::Inactive,
+            }
+        }
+    }
+    pub fn part1() {
+        const CYCLES: usize = 6;
+        let mut cubes = include_str!("../inputs/day17.txt")
+            .lines()
+            .enumerate()
+            .fold(HashMap::new(), |mut hm, (y, line)| {
+                line.as_bytes().iter().enumerate().for_each(|(x, byte)| {
+                    hm.insert((x as i32, y as i32, 0i32), State::from_bytes(*byte));
+                });
+                hm
+            });
+
+        fn neighbours(x: i32, y: i32, z: i32) -> Vec<(i32, i32, i32)> {
+            let mut neighs = Vec::new();
+            for x_i in x - 1..=x + 1 {
+                for y_i in y - 1..=y + 1 {
+                    for z_i in z - 1..=z + 1 {
+                        if (x, y, z) != (x_i, y_i, z_i) {
+                            neighs.push((x_i, y_i, z_i));
+                        }
+                    }
+                }
+            }
+            neighs
+        }
+
+        for _ in 0..CYCLES {
+            let mut checkers = HashSet::new();
+            for &(x, y, z) in cubes.keys() {
+                (x - 1..=x + 1)
+                    .flat_map(|x_i| {
+                        (y - 1..=y + 1)
+                            .flat_map(|y_i| {
+                                (z - 1..=z + 1)
+                                    .map(|z_i| (y_i, z_i))
+                                    .collect::<Vec<(i32, i32)>>()
+                            })
+                            .map(|(y, z)| (x_i, y, z))
+                            .collect::<Vec<(i32, i32, i32)>>()
+                    })
+                    .for_each(|s| {
+                        checkers.insert(s);
+                    });
+            }
+
+            let state_changes: Vec<((i32, i32, i32), State)> = checkers
+                .into_iter()
+                .filter_map(|(x, y, z)| {
+                    let state = match cubes.get(&(x, y, z)) {
+                        Some(State::Active) => State::Active,
+                        _ => State::Inactive,
+                    };
+                    let active_neighbours = neighbours(x, y, z)
+                        .iter()
+                        .filter(|cube| matches!(cubes.get(cube), Some(State::Active)))
+                        .count();
+                    match state {
+                        State::Active if !(2..=3).contains(&active_neighbours) => {
+                            Some(((x, y, z), State::Inactive))
+                        }
+                        State::Inactive if active_neighbours == 3 => {
+                            Some(((x, y, z), State::Active))
+                        }
+                        _ => None,
+                    }
+                })
+                .collect();
+            cubes.extend(state_changes.into_iter());
+        }
+
+        println!(
+            "{}",
+            cubes
+                .values()
+                .filter(|cube| matches!(cube, State::Active))
+                .count()
+        );
+    }
+    pub fn part2() {
+        const CYCLES: usize = 6;
+        let mut cubes = include_str!("../inputs/day17.txt")
+            .lines()
+            .enumerate()
+            .fold(HashMap::new(), |mut hm, (y, line)| {
+                line.as_bytes().iter().enumerate().for_each(|(x, byte)| {
+                    hm.insert((x as i32, y as i32, 0i32, 0i32), State::from_bytes(*byte));
+                });
+                hm
+            });
+
+        fn neighbours(x: i32, y: i32, z: i32, w: i32) -> Vec<(i32, i32, i32, i32)> {
+            let mut neighs = Vec::new();
+            for x_i in x - 1..=x + 1 {
+                for y_i in y - 1..=y + 1 {
+                    for z_i in z - 1..=z + 1 {
+                        for w_i in w - 1..=w + 1 {
+                            if (x, y, z, w) != (x_i, y_i, z_i, w_i) {
+                                neighs.push((x_i, y_i, z_i, w_i));
+                            }
+                        }
+                    }
+                }
+            }
+            neighs
+        }
+
+        for _ in 0..CYCLES {
+            let mut checkers: HashSet<(i32, i32, i32, i32)> = HashSet::new();
+            for &(x, y, z, w) in cubes.keys() {
+                for s in &neighbours(x, y, z, w) {
+                    checkers.insert(*s);
+                }
+            }
+            let state_changes: Vec<((i32, i32, i32, i32), State)> = checkers
+                .into_iter()
+                .filter_map(|(x, y, z, w)| {
+                    let state = match cubes.get(&(x, y, z, w)) {
+                        Some(State::Active) => State::Active,
+                        _ => State::Inactive,
+                    };
+                    let active_neighbours = neighbours(x, y, z, w)
+                        .iter()
+                        .filter(|cube| matches!(cubes.get(cube), Some(State::Active)))
+                        .count();
+                    match state {
+                        State::Active if !(2..=3).contains(&active_neighbours) => {
+                            Some(((x, y, z, w), State::Inactive))
+                        }
+                        State::Inactive if active_neighbours == 3 => {
+                            Some(((x, y, z, w), State::Active))
+                        }
+                        _ => None,
+                    }
+                })
+                .collect();
+            cubes.extend(state_changes.into_iter());
+        }
+
+        println!(
+            "{}",
+            cubes
+                .values()
+                .filter(|cube| matches!(cube, State::Active))
+                .count()
+        );
+    }
+}
+mod day18 {
+    enum Value {
+        Number(u64),
+        Brackets(Eqn),
+    }
+    impl Value {
+        fn calc(self) -> u64 {
+            match self {
+                Value::Number(i) => i,
+                Value::Brackets(eqn) => eqn.eval(),
+            }
+        }
+        fn from_str_plus_mult_equal(s: &str) -> Self {
+            match s.as_bytes()[0] {
+                b'(' => Value::Brackets(Eqn::from_str_plus_mult_equal(&s[1..s.len()])),
+                _ => Value::Number(s.parse().unwrap()),
+            }
+        }
+    }
+    enum Eqn {
+        Add(Box<Value>, Box<Value>),
+        Mult(Box<Value>, Box<Value>),
+    }
+    impl Eqn {
+        fn eval(self) -> u64 {
+            match self {
+                Eqn::Add(left, right) => left.calc() + right.calc(),
+                Eqn::Mult(left, right) => left.calc() * right.calc(),
+            }
+        }
+        fn from_str_plus_before_mult(s: &str) -> Self {
+            // extract brackets, adds, then mults
+            enum ValOrOps {
+                Val(Value),
+                Add,
+                Multiply,
+            }
+            impl ValOrOps {
+                fn take_val(self) -> Value {
+                    match self {
+                        ValOrOps::Val(value) => value,
+                        _ => panic!(),
+                    }
+                }
+            }
+            let mut i = 0;
+            let mut tokens = Vec::new();
+
+            while i < s.len() {
+                match s.as_bytes()[i] {
+                    b' ' => i += 1,
+                    b'+' => {
+                        i += 1;
+                        tokens.push(ValOrOps::Add);
+                    }
+                    b'*' => {
+                        i += 1;
+                        tokens.push(ValOrOps::Multiply)
+                    }
+                    b'0'..=b'9' => {
+                        let start = i;
+                        while i < s.len() && (b'0'..=b'9').contains(&s.as_bytes()[i]) {
+                            i += 1;
+                        }
+                        let num = Value::Number(s[start..i].parse().unwrap());
+                        tokens.push(ValOrOps::Val(num));
+                    }
+                    b'(' => {
+                        let mut brackets = 1;
+                        i += 1;
+                        let start = i;
+                        while brackets != 0 {
+                            match s.as_bytes()[i] {
+                                b'(' => brackets += 1,
+                                b')' => brackets -= 1,
+                                _ => {}
+                            }
+                            i += 1;
+                        }
+                        let brackets =
+                            Value::Brackets(Eqn::from_str_plus_before_mult(&s[start..i - 1]));
+                        tokens.push(ValOrOps::Val(brackets));
+                    }
+                    _ => {
+                        unreachable!("{}", &s[i..=i])
+                    }
+                }
+            }
+
+            let mut i = 1;
+            while i < tokens.len() {
+                match tokens[i] {
+                    ValOrOps::Add => {
+                        let right = tokens.remove(i + 1).take_val();
+                        tokens.remove(i);
+                        let left = tokens.remove(i - 1).take_val();
+                        let new = ValOrOps::Val(Value::Brackets(Eqn::Add(
+                            Box::new(left),
+                            Box::new(right),
+                        )));
+
+                        tokens.insert(i - 1, new);
+                    }
+                    ValOrOps::Multiply => i += 2,
+                    _ => unreachable!(),
+                }
+            }
+
+            let first = tokens
+                .into_iter()
+                .fold(None, |prev, curr| match curr {
+                    ValOrOps::Val(v) => {
+                        if let Some(prev) = prev {
+                            Some(Value::Brackets(Eqn::Mult(Box::new(prev), Box::new(v))))
+                        } else {
+                            Some(v)
+                        }
+                    }
+                    ValOrOps::Add | ValOrOps::Multiply => prev,
+                })
+                .unwrap();
+
+            match first {
+                Value::Number(_) => {
+                    panic!()
+                }
+                Value::Brackets(eqn) => eqn,
+            }
+        }
+        fn from_str_plus_mult_equal(s: &str) -> Self {
+            let mut i = 0;
+            let mut left: Option<Value> = None;
+            let mut is_plus = false;
+
+            while i < s.len() {
+                match s.as_bytes()[i] {
+                    b'(' => {
+                        let mut brackets = 1;
+                        i += 1;
+                        let start = i;
+                        while brackets != 0 {
+                            match s.as_bytes()[i] {
+                                b'(' => brackets += 1,
+                                b')' => brackets -= 1,
+                                _ => {}
+                            }
+                            i += 1;
+                        }
+                        let brackets =
+                            Value::Brackets(Eqn::from_str_plus_mult_equal(&s[start..i - 1]));
+                        if let Some(l) = left {
+                            left = if is_plus {
+                                Some(Value::Brackets(Eqn::Add(Box::new(l), Box::new(brackets))))
+                            } else {
+                                Some(Value::Brackets(Eqn::Mult(Box::new(l), Box::new(brackets))))
+                            }
+                        } else {
+                            left = Some(brackets);
+                        }
+                    }
+                    b' ' => {
+                        i += 1;
+                    }
+                    b'+' => {
+                        i += 1;
+                        is_plus = true;
+                    }
+                    b'*' => {
+                        i += 1;
+                        is_plus = false;
+                    }
+                    b'0'..=b'9' => {
+                        let start = i;
+                        while i < s.len() && (b'0'..=b'9').contains(&s.as_bytes()[i]) {
+                            i += 1;
+                        }
+                        let num = Value::Number(s[start..i].parse().unwrap());
+                        if let Some(l) = left {
+                            left = if is_plus {
+                                Some(Value::Brackets(Eqn::Add(Box::new(l), Box::new(num))))
+                            } else {
+                                Some(Value::Brackets(Eqn::Mult(Box::new(l), Box::new(num))))
+                            }
+                        } else {
+                            left = Some(num);
+                        }
+                    }
+                    _ => {
+                        unreachable!("{}", &s[i..=i])
+                    }
+                }
+            }
+
+            match left.unwrap() {
+                Value::Number(_) => {
+                    panic!("equation is just a number")
+                }
+                Value::Brackets(eqn) => eqn,
+            }
+        }
+    }
+    pub fn part1() {
+        println!(
+            "{}",
+            include_str!("../inputs/day18.txt")
+                .lines()
+                .map(|line| { Eqn::from_str_plus_mult_equal(line).eval() })
+                .sum::<u64>()
+        );
+    }
+    pub fn part2() {
+        println!(
+            "{}",
+            include_str!("../inputs/day18.txt")
+                .lines()
+                .map(|line| { Eqn::from_str_plus_before_mult(line).eval() })
+                .sum::<u64>()
+        );
+    }
+    #[test]
+    fn test_eval_equal() {
+        let eqns = [
+            ("1 + 2 * 3 + 4 * 5 + 6", 71),
+            ("1 + (2 * 3) + (4 * (5 + 6))", 51),
+            ("2 * 3 + (4 * 5)", 26),
+            ("5 + (8 * 3 + 9 + 3 * 4 * 3)", 437),
+            ("5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))", 12240),
+            ("((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2", 13632),
+        ];
+        for &(eqn, expected) in &eqns {
+            assert_eq!(Eqn::from_str_plus_mult_equal(eqn).eval(), expected);
+        }
+    }
+    #[test]
+    fn test_eval_plus_first() {
+        let eqns = [
+            ("1 + 2 * 3 + 4 * 5 + 6", 231),
+            ("1 + (2 * 3) + (4 * (5 + 6))", 51),
+            ("2 * 3 + (4 * 5)", 46),
+            ("5 + (8 * 3 + 9 + 3 * 4 * 3)", 1445),
+            ("5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))", 669060),
+            ("((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2", 23340),
+        ];
+        for &(eqn, expected) in &eqns {
+            assert_eq!(Eqn::from_str_plus_before_mult(eqn).eval(), expected);
+        }
     }
 }
