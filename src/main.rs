@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 fn main() {
-    day18::part2();
+    day21::part2();
 }
 
 mod day1 {
@@ -1876,5 +1876,843 @@ mod day18 {
         for &(eqn, expected) in &eqns {
             assert_eq!(Eqn::from_str_plus_before_mult(eqn).eval(), expected);
         }
+    }
+}
+mod day19 {
+    use std::collections::{HashMap, VecDeque};
+    enum Rule {
+        Single(char),
+        Array(Vec<u32>),
+        Alt(Vec<u32>, Vec<u32>),
+    }
+    struct Rules {
+        rules: HashMap<u32, Rule>,
+    }
+    impl Rules {
+        fn matches(&self, s: &str) -> bool {
+            let mut queue = VecDeque::new();
+            queue.push_back((vec![self.rules.get(&0).unwrap()], s));
+            while let Some((mut rules, substr)) = queue.pop_front() {
+                if let Some(rule) = rules.pop() {
+                    if substr.is_empty() {
+                        continue;
+                    }
+                    match rule {
+                        Rule::Single(chr) => {
+                            if &substr.chars().next().unwrap() == chr {
+                                queue.push_back((rules, &substr[1..]));
+                            }
+                        }
+                        Rule::Array(arr) => {
+                            rules.extend(
+                                arr.iter()
+                                    .map(|rule_id| self.rules.get(rule_id).unwrap())
+                                    .rev(),
+                            );
+                            queue.push_back((rules, substr));
+                        }
+                        Rule::Alt(left, right) => {
+                            let mut left_rules = rules.clone();
+                            left_rules.extend(
+                                left.iter()
+                                    .map(|rule_id| self.rules.get(rule_id).unwrap())
+                                    .rev(),
+                            );
+                            queue.push_back((left_rules, substr));
+                            let mut right_rules = rules;
+                            right_rules.extend(
+                                right
+                                    .iter()
+                                    .map(|rule_id| self.rules.get(rule_id).unwrap())
+                                    .rev(),
+                            );
+                            queue.push_back((right_rules, substr));
+                        }
+                    }
+                } else if substr.is_empty() {
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+    impl std::str::FromStr for Rules {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut rules = HashMap::new();
+            for rule in s.lines() {
+                let mut rule = rule.split(": ");
+                let rule_id = rule.next().unwrap().parse().unwrap();
+                let rule_matches = rule.next().unwrap();
+                if &rule_matches[..1] == "\"" {
+                    rules.insert(rule_id, Rule::Single(rule_matches.chars().nth(1).unwrap()));
+                } else if rule_matches.contains(" | ") {
+                    let mut rule = rule_matches.split(" | ");
+                    let left = rule
+                        .next()
+                        .unwrap()
+                        .split(' ')
+                        .map(|n| n.parse().unwrap())
+                        .collect();
+                    let right = rule
+                        .next()
+                        .unwrap()
+                        .split(' ')
+                        .map(|n| n.parse().unwrap())
+                        .collect();
+                    rules.insert(rule_id, Rule::Alt(left, right));
+                } else {
+                    rules.insert(
+                        rule_id,
+                        Rule::Array(
+                            rule_matches
+                                .split(' ')
+                                .map(|n| n.parse().unwrap())
+                                .collect(),
+                        ),
+                    );
+                }
+            }
+            Ok(Self { rules })
+        }
+    }
+    pub fn part1() {
+        let mut input = include_str!("../inputs/day19.txt").split("\r\n\r\n");
+        let rules: Rules = input.next().unwrap().parse().unwrap();
+        let messages: Vec<&str> = input.next().unwrap().lines().collect();
+        println!(
+            "{}",
+            messages.iter().filter(|msg| rules.matches(msg)).count()
+        );
+    }
+    pub fn part2() {
+        let mut input = include_str!("../inputs/day19.txt").split("\r\n\r\n");
+        let rules: Rules = {
+            let mut rules: Rules = input.next().unwrap().parse().unwrap();
+            rules.rules.insert(8, Rule::Alt(vec![42], vec![42, 8]));
+            rules
+                .rules
+                .insert(11, Rule::Alt(vec![42, 31], vec![42, 11, 31]));
+            rules
+        };
+        let messages: Vec<&str> = input.next().unwrap().lines().collect();
+        println!(
+            "{}",
+            messages.iter().filter(|msg| rules.matches(msg)).count()
+        );
+    }
+    #[test]
+    fn parse_messages() {
+        let rules: Rules = r#"0: 4 1 5
+1: 2 3 | 3 2
+2: 4 4 | 5 5
+3: 4 5 | 5 4
+4: "a"
+5: "b"
+"#
+        .parse()
+        .unwrap();
+        let messages = [
+            ("ababbb", true),
+            ("bababa", false),
+            ("abbbab", true),
+            ("aaabbb", false),
+            ("aaaabbb", false),
+        ];
+        for &(msg, valid) in &messages {
+            assert_eq!(rules.matches(msg), valid);
+        }
+    }
+}
+mod day20 {
+    use std::collections::{HashMap, HashSet};
+
+    fn sqrt(n: usize) -> usize {
+        let mut i = 0;
+        while i * i <= n {
+            if i * i == n {
+                return i;
+            }
+            i += 1
+        }
+        panic!("not a square")
+    }
+    #[derive(Debug, Clone)]
+    struct Tile {
+        id: u64,
+        grid: Vec<Vec<bool>>,
+    }
+    struct Sides {
+        top: usize,
+        bot: usize,
+        left: usize,
+        right: usize,
+        top_inv: usize,
+        bot_inv: usize,
+        left_inv: usize,
+        right_inv: usize,
+    }
+    impl Sides {
+        fn contains(&self, val: usize) -> bool {
+            let Sides {
+                top,
+                bot,
+                left,
+                right,
+                top_inv,
+                bot_inv,
+                left_inv,
+                right_inv,
+            } = self;
+            let val = &val;
+            top == val
+                || bot == val
+                || left == val
+                || right == val
+                || top_inv == val
+                || bot_inv == val
+                || left_inv == val
+                || right_inv == val
+        }
+    }
+    enum TileSide {
+        Corner,
+        Edge,
+        Centre,
+    }
+    impl Tile {
+        fn len(&self) -> usize {
+            self.grid.len()
+        }
+        fn allsides(&self) -> Sides {
+            let top = self.top();
+            let left = self.left();
+            let right = self.right();
+            let bot = self.bottom();
+            let top_inv = count(&self.grid[0].iter().copied().rev().collect::<Vec<_>>());
+            let left_inv = count(&self.grid.iter().map(|row| row[0]).rev().collect::<Vec<_>>());
+            let right_inv = count(
+                &self
+                    .grid
+                    .iter()
+                    .map(|row| row[row.len() - 1])
+                    .rev()
+                    .collect::<Vec<_>>(),
+            );
+            let bot_inv = count(
+                &self.grid[self.len() - 1]
+                    .iter()
+                    .copied()
+                    .rev()
+                    .collect::<Vec<_>>(),
+            );
+
+            Sides {
+                top,
+                bot,
+                left,
+                right,
+                top_inv,
+                bot_inv,
+                left_inv,
+                right_inv,
+            }
+        }
+        fn top(&self) -> usize {
+            count(&self.grid[0])
+        }
+        fn left(&self) -> usize {
+            count(&self.grid.iter().map(|row| row[0]).collect::<Vec<_>>())
+        }
+        fn right(&self) -> usize {
+            count(
+                &self
+                    .grid
+                    .iter()
+                    .map(|row| row[row.len() - 1])
+                    .collect::<Vec<_>>(),
+            )
+        }
+        fn bottom(&self) -> usize {
+            count(&self.grid[self.len() - 1])
+        }
+        fn rotate_cw(&mut self) {
+            self.grid = (0..self.len())
+                .map(|i| self.grid.iter().rev().map(|row| row[i]).collect())
+                .collect();
+        }
+        fn flip_right(&mut self) {
+            self.grid.iter_mut().for_each(|row| row.reverse());
+        }
+        fn flip_down(&mut self) {
+            self.grid.reverse();
+        }
+        fn strip_borders(&mut self) {
+            self.grid = self.grid[1..self.grid.len() - 1]
+                .iter()
+                .map(|row| row[1..row.len() - 1].to_vec())
+                .collect();
+        }
+        fn position(&self, map: &HashMap<usize, i32>) -> TileSide {
+            match [self.top(), self.bottom(), self.left(), self.right()]
+                .iter()
+                .filter(|edge| map[edge] == 1)
+                .count()
+            {
+                0 => TileSide::Centre,
+                1 => TileSide::Edge,
+                2 => TileSide::Corner,
+                _ => panic!(),
+            }
+        }
+        fn rotate_until<T: Fn(&Tile) -> bool>(mut self, cond: T) -> Self {
+            for _ in 0..4 {
+                if cond(&self) {
+                    return self;
+                } else {
+                    self.rotate_cw();
+                }
+            }
+            self.flip_down();
+            for _ in 0..4 {
+                if cond(&self) {
+                    return self;
+                } else {
+                    self.rotate_cw();
+                }
+            }
+            panic!("condition unfufillable")
+        }
+    }
+    fn count(nums: &[bool]) -> usize {
+        nums.iter()
+            .fold(0, |acc, i| if *i { (acc << 1) + 1 } else { acc << 1 })
+    }
+    impl std::str::FromStr for Tile {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut grid = s.lines();
+            let id = grid
+                .next()
+                .unwrap()
+                .strip_prefix("Tile ")
+                .unwrap()
+                .strip_suffix(':')
+                .unwrap()
+                .parse()
+                .unwrap();
+            let grid = grid
+                .map(|row| row.as_bytes().iter().map(|tile| *tile == b'#').collect())
+                .collect();
+
+            Ok(Self { id, grid })
+        }
+    }
+    pub fn part1() {
+        let input: Vec<Tile> = include_str!("../inputs/day20.txt")
+            .split("\r\n\r\n")
+            .filter(|tile| !tile.is_empty())
+            .map(|grid| grid.parse().unwrap())
+            .collect();
+
+        let mut seen = HashMap::new();
+        for tile in &input {
+            let Sides {
+                top,
+                bot,
+                left,
+                right,
+                top_inv,
+                bot_inv,
+                left_inv,
+                right_inv,
+            } = tile.allsides();
+            let sides = [top, bot, left, right, top_inv, bot_inv, left_inv, right_inv];
+            for &i in &sides {
+                *seen.entry(i).or_insert(0) += 1;
+            }
+        }
+
+        println!(
+            "{}",
+            input
+                .iter()
+                .filter_map(|tile| {
+                    let Sides {
+                        top,
+                        bot,
+                        left,
+                        right,
+                        top_inv,
+                        bot_inv,
+                        left_inv,
+                        right_inv,
+                    } = tile.allsides();
+                    if [top, bot, left, right, top_inv, bot_inv, left_inv, right_inv]
+                        .iter()
+                        .filter(|side| seen.get(side) == Some(&2))
+                        .count()
+                        == 2 * 2
+                    // each edge is counted twice, once forward and once backward (flipped)
+                    {
+                        Some(tile.id)
+                    } else {
+                        None
+                    }
+                })
+                .product::<u64>()
+        );
+    }
+    struct Image {
+        tiles: Vec<Vec<bool>>,
+    }
+    impl Image {
+        fn new(mut tiles: Vec<Tile>) -> Self {
+            let side_length = sqrt(tiles.len());
+            let mut grid: Vec<Vec<Tile>> = vec![vec![]; side_length];
+            let mut seen = HashMap::new();
+            for tile in &tiles {
+                let Sides {
+                    top,
+                    bot,
+                    left,
+                    right,
+                    top_inv,
+                    bot_inv,
+                    left_inv,
+                    right_inv,
+                } = tile.allsides();
+                let sides = [top, bot, left, right, top_inv, bot_inv, left_inv, right_inv];
+                for &i in &sides {
+                    *seen.entry(i).or_insert(0) += 1;
+                }
+            }
+            let queue: Vec<(usize, usize)> = (0..side_length)
+                .flat_map(|x| (0..side_length).map(|y| (x, y)).collect::<Vec<_>>())
+                .collect();
+
+            for (x, y) in queue {
+                match (x, y) {
+                    (0, 0) => {
+                        //top left corner
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Corner) {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let corner = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.right()) == Some(&2)
+                                && seen.get(&tile.bottom()) == Some(&2)
+                        }); // rotate until sides are facing outwards
+
+                        grid[0].push(corner);
+                    }
+                    (0, y) if y == side_length - 1 => {
+                        // bottom left corner
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Corner)
+                                    && tile.allsides().contains(grid[y - 1][0].bottom())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let corner = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.right()) == Some(&2)
+                                && tile.top() == grid[y - 1][0].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(corner);
+                    }
+                    (x, y @ 0) if x == side_length - 1 => {
+                        // top right corner
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Corner)
+                                    && tile.allsides().contains(grid[y][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let corner = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.bottom()) == Some(&2)
+                                && tile.left() == grid[0][x - 1].right()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(corner);
+                    }
+                    (x, y) if x == side_length - 1 && y == side_length - 1 => {
+                        // bottom right corner
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Corner)
+                                    && tile.allsides().contains(grid[y][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let corner = tiles.swap_remove(pos).rotate_until(|tile| {
+                            tile.left() == grid[y][x - 1].right()
+                                && tile.top() == grid[y - 1][x].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(corner);
+                    }
+                    (x, y) if x >= side_length || y >= side_length => {
+                        // outside Image
+                        unreachable!();
+                    }
+                    (0, y) => {
+                        //left edge
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Edge)
+                                    && tile.allsides().contains(grid[y - 1][0].bottom())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let edge = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.right()) == Some(&2)
+                                && tile.top() == grid[y - 1][0].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(edge);
+                    }
+                    (x, 0) => {
+                        //top edge
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Edge)
+                                    && tile.allsides().contains(grid[0][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let edge = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.right()) == Some(&2)
+                                && seen.get(&tile.bottom()) == Some(&2)
+                                && tile.left() == grid[0][x - 1].right()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(edge);
+                    }
+                    (x, y) if x == side_length - 1 => {
+                        // right edge
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Edge)
+                                    && tile.allsides().contains(grid[y][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let edge = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.bottom()) == Some(&2)
+                                && tile.left() == grid[y][x - 1].right()
+                                && tile.top() == grid[y - 1][x].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(edge);
+                    }
+                    (x, y) if y == side_length - 1 => {
+                        // bottom edge
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Edge)
+                                    && tile.allsides().contains(grid[y][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let edge = tiles.swap_remove(pos).rotate_until(|tile| {
+                            seen.get(&tile.right()) == Some(&2)
+                                && tile.left() == grid[y][x - 1].right()
+                                && tile.top() == grid[y - 1][x].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(edge);
+                    }
+                    (x, y) => {
+                        //middle tiles
+                        let pos = tiles
+                            .iter()
+                            .enumerate()
+                            .find_map(|(i, tile)| {
+                                if matches!(tile.position(&seen), TileSide::Centre)
+                                    && tile.allsides().contains(grid[y][x - 1].right())
+                                {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap();
+                        let tile = tiles.swap_remove(pos).rotate_until(|tile| {
+                            tile.left() == grid[y][x - 1].right()
+                                && tile.top() == grid[y - 1][x].bottom()
+                        }); // rotate until sides are facing correct directions
+
+                        grid[y].push(tile);
+                    }
+                };
+            }
+
+            grid.iter_mut()
+                .for_each(|row| row.iter_mut().for_each(Tile::strip_borders));
+
+            let mut tiles = Vec::new();
+            for row in grid {
+                for i in 0..row[0].grid.len() {
+                    tiles.push(row.iter().flat_map(|tile| &tile.grid[i]).copied().collect());
+                }
+            }
+            Self { tiles }
+        }
+        fn count_monster(&self, monster: &[Vec<u8>]) -> usize {
+            let (monster_pixels, width, height): (Vec<(usize, usize)>, usize, usize) = {
+                (
+                    monster
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(y, row)| {
+                            row.iter()
+                                .enumerate()
+                                .filter_map(
+                                    |(x, pixel)| {
+                                        if pixel == &b'#' {
+                                            Some((x, y))
+                                        } else {
+                                            None
+                                        }
+                                    },
+                                )
+                                .collect::<Vec<_>>()
+                        })
+                        .collect(),
+                    monster[0].len(),
+                    monster.len(),
+                )
+            };
+
+            let mut part_of_monster = HashSet::new();
+
+            for x in 0..(self.tiles[0].len() - width) {
+                for y in 0..(self.tiles.len() - height) {
+                    if monster_pixels
+                        .iter()
+                        .all(|&(delta_x, delta_y)| self.tiles[y + delta_y][x + delta_x])
+                    {
+                        for &(delta_x, delta_y) in &monster_pixels {
+                            part_of_monster.insert((x + delta_x, y + delta_y));
+                        }
+                    }
+                }
+            }
+            part_of_monster.len()
+        }
+        fn roughness(&self) -> usize {
+            // rotate image of monster instead
+            let mut monster = vec![
+                b"                  # ".to_vec(),
+                b"#    ##    ##    ###".to_vec(),
+                b" #  #  #  #  #  #   ".to_vec(),
+            ];
+            let rotate = |monster: &mut Vec<Vec<u8>>| {
+                let new_monster = (0..monster[0].len())
+                    .map(|i| (0..monster.len()).rev().map(|j| monster[j][i]).collect())
+                    .collect();
+                *monster = new_monster;
+            };
+            let rough_tiles: usize = self
+                .tiles
+                .iter()
+                .map(|row| row.iter().filter(|tile| **tile).count())
+                .sum();
+
+            for _ in 0..4 {
+                let count = self.count_monster(&monster);
+                if count > 0 {
+                    return rough_tiles - count;
+                } else {
+                    rotate(&mut monster);
+                }
+            }
+            // flip the grid
+            monster.reverse();
+            for _ in 0..4 {
+                let count = self.count_monster(&monster);
+                if count > 0 {
+                    return rough_tiles - count;
+                } else {
+                    rotate(&mut monster);
+                }
+            }
+            panic!("no monsters found")
+        }
+    }
+    pub fn part2() {
+        let input: Vec<Tile> = include_str!("../inputs/day20.txt")
+            .split("\r\n\r\n")
+            .filter(|tile| !tile.is_empty())
+            .map(|grid| grid.parse().unwrap())
+            .collect();
+
+        let image = Image::new(input);
+        println!("{}", image.roughness())
+    }
+}
+mod day21 {
+    use std::collections::{HashMap, HashSet};
+    struct Food<'a> {
+        ingredients: Vec<&'a str>,
+        allergerns: Vec<&'a str>,
+    }
+    impl<'a> Food<'a> {
+        fn parse(s: &'a str) -> Self {
+            let mut s = s.split(" (contains ");
+            let ingredients = s.next().unwrap().split(' ').collect();
+            let allergerns = s
+                .next()
+                .unwrap()
+                .strip_suffix(')')
+                .unwrap()
+                .split(", ")
+                .collect();
+
+            Food {
+                ingredients,
+                allergerns,
+            }
+        }
+    }
+    fn intersection(set1: &mut Vec<&str>, set2: &[&str]) {
+        set1.retain(|x| set2.contains(x));
+    }
+    pub fn part1() {
+        let input: Vec<Food> = include_str!("../inputs/day21.txt")
+            .lines()
+            .map(|line| Food::parse(line))
+            .collect();
+        let mut possible = HashMap::new();
+        for food in &input {
+            for allergen in &food.allergerns {
+                let pos = possible
+                    .entry(allergen)
+                    .or_insert_with(|| food.ingredients.clone());
+                intersection(pos, &food.ingredients);
+            }
+        }
+        let mut confirmed_allergens = HashSet::new();
+        while !possible.is_empty() {
+            possible.retain(|_key, value| {
+                value.retain(|ingredient| !confirmed_allergens.contains(ingredient));
+                if value.len() == 1 {
+                    confirmed_allergens.insert(value[0]);
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+
+        println!(
+            "{}",
+            input
+                .iter()
+                .map(|food| food
+                    .ingredients
+                    .iter()
+                    .filter(|ingredient| !confirmed_allergens.contains(*ingredient))
+                    .count())
+                .sum::<usize>()
+        )
+    }
+    pub fn part2() {
+        let input: Vec<Food> = include_str!("../inputs/day21.txt")
+            .lines()
+            .map(|line| Food::parse(line))
+            .collect();
+        let mut possible = HashMap::new();
+        for food in &input {
+            for allergen in &food.allergerns {
+                let pos = possible
+                    .entry(allergen)
+                    .or_insert_with(|| food.ingredients.clone());
+                intersection(pos, &food.ingredients);
+            }
+        }
+        let mut confirmed_allergens = possible
+            .values()
+            .filter_map(|possibles| {
+                if possibles.len() == 1 {
+                    Some(possibles[0])
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+        while possible.values().any(|possibles| possibles.len() > 1) {
+            possible
+                .values_mut()
+                .filter(|possibles| possibles.len() > 1)
+                .for_each(|possibles| {
+                    possibles.retain(|pos| !confirmed_allergens.contains(pos));
+                    if possibles.len() == 1 {
+                        confirmed_allergens.insert(possibles[0]);
+                    }
+                });
+        }
+        let mut dangerous_ingredient_list: Vec<&str> = possible.keys().map(|k| **k).collect();
+        dangerous_ingredient_list.sort_unstable();
+        for allergen in &mut dangerous_ingredient_list {
+            *allergen = possible[allergen][0];
+        }
+
+        println!("{}", dangerous_ingredient_list.join(","));
     }
 }
