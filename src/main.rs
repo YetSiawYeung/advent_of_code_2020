@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 fn main() {
-    day21::part2();
+    day25::part1();
 }
 
 mod day1 {
@@ -2714,5 +2714,509 @@ mod day21 {
         }
 
         println!("{}", dangerous_ingredient_list.join(","));
+    }
+}
+mod day22 {
+    use std::collections::{HashMap, HashSet, VecDeque};
+    fn score(deck: &VecDeque<usize>) -> usize {
+        (1..=deck.len())
+            .zip(deck.iter().rev())
+            .map(|(i, &j)| i * j)
+            .sum::<usize>()
+    }
+    pub fn part1() {
+        let mut input = include_str!("../inputs/day22.txt")
+            .split("\r\n\r\n")
+            .filter(|string| !string.is_empty());
+
+        let mut player1: VecDeque<usize> = input
+            .next()
+            .unwrap()
+            .strip_prefix("Player 1:")
+            .unwrap()
+            .trim()
+            .lines()
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let mut player2: VecDeque<usize> = input
+            .next()
+            .unwrap()
+            .strip_prefix("Player 2:")
+            .unwrap()
+            .trim()
+            .lines()
+            .map(|n| n.parse().unwrap())
+            .collect();
+
+        while !(player1.is_empty() || player2.is_empty()) {
+            let card1 = player1.pop_front().unwrap();
+            let card2 = player2.pop_front().unwrap();
+            if card1 > card2 {
+                player1.push_back(card1);
+                player1.push_back(card2);
+            } else {
+                player2.push_back(card2);
+                player2.push_back(card1);
+            }
+        }
+
+        let winner = if player1.is_empty() {
+            &player2
+        } else {
+            &player1
+        };
+        println!("{}", score(winner));
+    }
+    #[derive(Debug, Clone)]
+    enum Winner {
+        Player1(VecDeque<usize>),
+        Player2(VecDeque<usize>),
+    }
+    impl Winner {
+        fn take_cards(self) -> VecDeque<usize> {
+            match self {
+                Winner::Player1(cards) | Winner::Player2(cards) => cards,
+            }
+        }
+    }
+    fn recursive_combat(
+        p1: &VecDeque<usize>,
+        p2: &VecDeque<usize>,
+        memo: &mut HashMap<(VecDeque<usize>, VecDeque<usize>), Winner>,
+    ) -> Winner {
+        if memo.contains_key(&(p1.clone(), p2.clone())) {
+            return memo[&(p1.clone(), p2.clone())].clone();
+        }
+        // true if player1 won, false otherwise
+        let mut player1 = p1.clone();
+        let mut player2 = p2.clone();
+        let mut seen = HashSet::new();
+
+        while !(player1.is_empty() || player2.is_empty()) {
+            if seen.contains(&(player1.clone(), player2.clone())) {
+                return Winner::Player1(player1);
+            } else {
+                seen.insert((player1.clone(), player2.clone()));
+            }
+            let card1 = player1.pop_front().unwrap();
+            let card2 = player2.pop_front().unwrap();
+            let recursive_winner = if card1 <= player1.len() && card2 <= player2.len() {
+                Some(matches!(
+                    recursive_combat(
+                        &player1.iter().take(card1).copied().collect(),
+                        &player2.iter().take(card2).copied().collect(),
+                        memo
+                    ),
+                    Winner::Player1(_)
+                ))
+            } else {
+                None
+            };
+
+            if recursive_winner.unwrap_or_else(|| card1 > card2) {
+                player1.push_back(card1);
+                player1.push_back(card2);
+            } else {
+                player2.push_back(card2);
+                player2.push_back(card1);
+            };
+        }
+
+        let winner = if player2.is_empty() {
+            Winner::Player1(player1)
+        } else {
+            Winner::Player2(player2)
+        };
+        memo.insert((p1.clone(), p2.clone()), winner.clone());
+
+        winner
+    }
+    pub fn part2() {
+        let mut input = include_str!("../inputs/day22.txt")
+            .split("\r\n\r\n")
+            .filter(|string| !string.is_empty());
+
+        let player1: VecDeque<usize> = input
+            .next()
+            .unwrap()
+            .strip_prefix("Player 1:")
+            .unwrap()
+            .trim()
+            .lines()
+            .map(|n| n.parse().unwrap())
+            .collect();
+        let player2: VecDeque<usize> = input
+            .next()
+            .unwrap()
+            .strip_prefix("Player 2:")
+            .unwrap()
+            .trim()
+            .lines()
+            .map(|n| n.parse().unwrap())
+            .collect();
+
+        let winner = recursive_combat(&player1, &player2, &mut HashMap::new()).take_cards();
+        println!("{}", score(&winner));
+    }
+}
+mod day23 {
+    struct CrabCups {
+        current: usize,
+        next_cup: Vec<usize>,
+    }
+    impl CrabCups {
+        fn new(vec: &[u32]) -> Self {
+            let mut next_cup = vec![0; vec.len() + 1];
+            next_cup[0] = vec[0] as usize;
+            next_cup[*vec.last().unwrap() as usize] = vec[0] as usize;
+            for i in vec.windows(2) {
+                if let [first, second] = i {
+                    next_cup[*first as usize] = *second as usize;
+                }
+            }
+            Self {
+                current: 0,
+                next_cup,
+            }
+        }
+        fn play(&mut self, moves: usize) {
+            let min_label = 1;
+            let max_label = self.next_cup.len() - 1;
+
+            for _ in 0..moves {
+                let current_cup = self.next_cup[self.current];
+
+                let first = self.next_cup[current_cup];
+                let second = self.next_cup[first];
+                let third = self.next_cup[second];
+
+                let after_third = self.next_cup[third];
+                let mut destination_label = current_cup - 1;
+                loop {
+                    if destination_label < min_label {
+                        destination_label = max_label;
+                    } else if [first, second, third].contains(&destination_label) {
+                        destination_label -= 1
+                    } else {
+                        break;
+                    }
+                }
+                let after_destination = self.next_cup[destination_label];
+                self.next_cup[destination_label] = first;
+                self.next_cup[third] = after_destination;
+
+                self.next_cup[current_cup] = after_third;
+                self.current = current_cup;
+            }
+        }
+        fn part1(&self) -> u32 {
+            let mut acc = 0;
+            let mut current = self.next_cup[1];
+            while current != 1 {
+                acc = acc * 10 + current;
+                current = self.next_cup[current];
+            }
+            acc as u32
+        }
+        fn part2(&self) -> u64 {
+            (self.next_cup[1] * self.next_cup[self.next_cup[1]]) as u64
+        }
+    }
+    pub fn part1() {
+        const LOOPS: usize = 100;
+        let mut cups = CrabCups::new(
+            &include_str!("../inputs/day23.txt")
+                .trim()
+                .bytes()
+                .map(|chr| u32::from(chr - b'0'))
+                .collect::<Vec<_>>(),
+        );
+
+        cups.play(LOOPS);
+
+        println!("{}", cups.part1());
+    }
+    pub fn part2() {
+        const LOOPS: usize = 10_000_000;
+        let mut cups = CrabCups::new(
+            &include_str!("../inputs/day23.txt")
+                .trim()
+                .bytes()
+                .map(|chr| u32::from(chr - b'0'))
+                .chain((include_str!("../inputs/day23.txt").trim().len() + 1) as u32..=1_000_000)
+                .collect::<Vec<_>>(),
+        );
+
+        cups.play(LOOPS);
+
+        println!("{}", cups.part2());
+    }
+}
+mod day24 {
+    use std::collections::HashMap;
+
+    #[derive(Debug)]
+    enum Direction {
+        East,
+        SouthEast,
+        SouthWest,
+        West,
+        NorthWest,
+        NorthEast,
+    }
+    #[derive(Debug)]
+    struct Path(Vec<Direction>);
+    impl std::str::FromStr for Path {
+        type Err = &'static str;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut path = Vec::new();
+            let mut s = s.bytes();
+            while let Some(dir) = s.next() {
+                match dir {
+                    b'e' => path.push(Direction::East),
+                    b'w' => path.push(Direction::West),
+                    b's' => match s.next() {
+                        Some(b'e') => path.push(Direction::SouthEast),
+                        Some(b'w') => path.push(Direction::SouthWest),
+                        _ => panic!("Expected 'e' or 'w'"),
+                    },
+                    b'n' => match s.next() {
+                        Some(b'e') => path.push(Direction::NorthEast),
+                        Some(b'w') => path.push(Direction::NorthWest),
+                        _ => panic!("Expected 'e' or 'w'"),
+                    },
+                    _ => panic!("Expected 'e' or 'w' or 's' or 'n'"),
+                }
+            }
+
+            Ok(Self(path))
+        }
+    }
+    #[derive(Debug, Clone)]
+    enum Colour {
+        Black,
+        White,
+    }
+    impl Colour {
+        fn flip(&mut self) {
+            *self = match self {
+                Colour::Black => Colour::White,
+                Colour::White => Colour::Black,
+            }
+        }
+    }
+    struct Grid {
+        mid: usize,
+        grid: Vec<Vec<Colour>>,
+    }
+    impl Grid {
+        fn new(tiles: HashMap<(i32, i32), bool>, len: usize) -> Self {
+            let mut grid = vec![vec![Colour::White; len]; len];
+            let mid = (len / 2) as i32;
+            for ((x, y), is_black) in tiles {
+                grid[(mid + y) as usize][(mid + x) as usize] = if is_black {
+                    Colour::Black
+                } else {
+                    Colour::White
+                };
+            }
+            Self {
+                mid: mid as usize,
+                grid,
+            }
+        }
+        fn flip(&mut self, times: usize) {
+            for _ in 0..times {
+                let mut flip = Vec::new();
+                for x in 0..self.grid[0].len() {
+                    for y in 0..self.grid.len() {
+                        if (x + y) % 2 != 0 {
+                            // if x+y is not divisible by 2 -> not on hexagon grid
+                            continue;
+                        }
+                        let adjacent = self
+                            .neighbours((x, y))
+                            .iter()
+                            .filter(|(x, y)| matches!(self.grid[*y][*x], Colour::Black))
+                            .count();
+
+                        match self.grid[y][x] {
+                            Colour::Black if !((1..=2).contains(&adjacent)) => flip.push((x, y)),
+                            Colour::White if adjacent == 2 => flip.push((x, y)),
+                            _ => {}
+                        }
+                    }
+                }
+                for (x, y) in flip {
+                    self.grid[y][x].flip();
+                }
+            }
+        }
+        fn black_tiles(&self) -> Vec<(usize, usize)> {
+            let mut tiles = Vec::new();
+            for y in 0..self.grid.len() {
+                for x in 0..self.grid[0].len() {
+                    if matches!(self.grid[y][x], Colour::Black) {
+                        tiles.push((x, y))
+                    }
+                }
+            }
+            tiles
+        }
+        fn neighbours(&self, (x, y): (usize, usize)) -> Vec<(usize, usize)> {
+            let mut neighbours = Vec::with_capacity(6);
+            if x >= 2 {
+                neighbours.push((x - 2, y))
+            }
+            if x + 2 < self.grid[0].len() {
+                neighbours.push((x + 2, y))
+            }
+            if x >= 1 {
+                if y >= 1 {
+                    neighbours.push((x - 1, y - 1))
+                }
+                if y + 1 < self.grid.len() {
+                    neighbours.push((x - 1, y + 1))
+                }
+            }
+            if x + 1 < self.grid[0].len() {
+                if y >= 1 {
+                    neighbours.push((x + 1, y - 1))
+                }
+                if y + 1 < self.grid.len() {
+                    neighbours.push((x + 1, y + 1))
+                }
+            }
+            neighbours
+        }
+    }
+    pub fn part1() {
+        let paths: Vec<Path> = include_str!("../inputs/day24.txt")
+            .lines()
+            .map(|line| line.parse().unwrap())
+            .collect();
+        let mut tiles: HashMap<(i32, i32), bool> = HashMap::new(); // true if black
+
+        for steps in paths {
+            let (mut x, mut y) = (0, 0);
+            for dir in steps.0 {
+                match dir {
+                    Direction::East => x += 2,
+                    Direction::SouthEast => {
+                        x += 1;
+                        y -= 1;
+                    }
+                    Direction::SouthWest => {
+                        x -= 1;
+                        y -= 1;
+                    }
+                    Direction::West => x -= 2,
+                    Direction::NorthWest => {
+                        x -= 1;
+                        y += 1;
+                    }
+                    Direction::NorthEast => {
+                        x += 1;
+                        y += 1;
+                    }
+                }
+            }
+            let colour = tiles.entry((x, y)).or_insert(false);
+            *colour = !*colour;
+        }
+
+        println!("{}", tiles.values().filter(|tile| **tile).count());
+    }
+    pub fn part2() {
+        const DAYS: usize = 100;
+        let paths: Vec<Path> = include_str!("../inputs/day24.txt")
+            .lines()
+            .map(|line| line.parse().unwrap())
+            .collect();
+        let mut tiles: HashMap<(i32, i32), bool> = HashMap::new(); // true if black
+
+        for steps in paths {
+            let (mut x, mut y) = (0, 0);
+            for dir in steps.0 {
+                match dir {
+                    Direction::East => x += 2,
+                    Direction::SouthEast => {
+                        x += 1;
+                        y -= 1;
+                    }
+                    Direction::SouthWest => {
+                        x -= 1;
+                        y -= 1;
+                    }
+                    Direction::West => x -= 2,
+                    Direction::NorthWest => {
+                        x -= 1;
+                        y += 1;
+                    }
+                    Direction::NorthEast => {
+                        x += 1;
+                        y += 1;
+                    }
+                }
+            }
+            let colour = tiles.entry((x, y)).or_insert(false);
+            *colour = !*colour;
+        }
+        let max_dist = tiles
+            .keys()
+            .map(|&(x, y)| {
+                let x = x.abs();
+                let y = y.abs();
+                if x > y {
+                    x
+                } else {
+                    y
+                }
+            })
+            .max()
+            .unwrap() as usize;
+        let length = 2 * DAYS + 2 * max_dist;
+
+        let mut grid = Grid::new(tiles, length);
+        grid.flip(DAYS);
+
+        println!("{}", grid.black_tiles().len());
+    }
+}
+mod day25 {
+    fn pub_key_to_loop_size(key: usize) -> usize {
+        let mut loops = 0;
+        let subject_number = 7;
+        let mut current = 1;
+        while key != current {
+            current *= subject_number;
+            current %= 20_201_227;
+            loops += 1;
+        }
+        loops
+    }
+    fn form_encryption_key(key: usize, loop_size: usize) -> usize {
+        let subject_number = key;
+        let mut current = 1;
+        for _ in 0..loop_size {
+            current *= subject_number;
+            current %= 20_201_227;
+        }
+        current
+    }
+    pub fn part1() {
+        let input: Vec<usize> = include_str!("../inputs/day25.txt")
+            .lines()
+            .map(|line| line.parse().unwrap())
+            .collect();
+        let key1 = input[0];
+        let key2 = input[1];
+
+        let loop_1 = pub_key_to_loop_size(key1);
+        let loop_2 = pub_key_to_loop_size(key2);
+
+        println!("{}", form_encryption_key(key2, loop_1));
+        println!("{}", form_encryption_key(key1, loop_2));
     }
 }
